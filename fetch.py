@@ -9,7 +9,7 @@ now = datetime.now(tz)
 date_str = now.strftime("%Y年%m月%d日")
 date_short = now.strftime("%Y-%m-%d")
 
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 
 # 抓取財經網站內容
 def fetch_news():
@@ -56,24 +56,27 @@ prompt = f"""你是台股權證分析助理。今日是{date_str}。
       "time": "時間如08:30"
     }}
   ]
-}}"""
+}}
+
+direction: bull=看多/認購, bear=看空/認售
+至少5筆，最多15筆。"""
 
 headers = {
     "Content-Type": "application/json",
-    "x-api-key": ANTHROPIC_API_KEY,
-    "anthropic-version": "2023-06-01"
+    "Authorization": f"Bearer {GROQ_API_KEY}"
 }
 
 payload = {
-    "model": "claude-haiku-4-5-20251001",
-    "max_tokens": 2000,
-    "messages": [{"role": "user", "content": prompt}]
+    "model": "llama-3.3-70b-versatile",
+    "messages": [{"role": "user", "content": prompt}],
+    "temperature": 0.3,
+    "max_tokens": 2000
 }
 
 try:
     print(f"正在抓取 {date_str} 的權證資料...")
     response = requests.post(
-        "https://api.anthropic.com/v1/messages",
+        "https://api.groq.com/openai/v1/chat/completions",
         headers=headers,
         json=payload,
         timeout=60
@@ -82,7 +85,7 @@ try:
     response.raise_for_status()
 
     data = response.json()
-    text = data["content"][0]["text"].strip()
+    text = data["choices"][0]["message"]["content"].strip()
 
     if text.startswith("```"):
         text = text.split("```")[1]
