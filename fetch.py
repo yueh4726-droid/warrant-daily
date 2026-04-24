@@ -36,7 +36,7 @@ direction: bull=看多/認購, bear=看空/認售
 source: udn=經濟日報, ctee=工商時報, broker=券商
 至少找5筆，最多15筆，依日期由新到舊排序。"""
 
-url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
+url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
 
 payload = {
     "contents": [{"parts": [{"text": prompt}]}],
@@ -51,10 +51,10 @@ try:
     print(f"正在抓取 {date_str} 的權證資料...")
     response = requests.post(url, json=payload, timeout=60)
     response.raise_for_status()
-    
+
     data = response.json()
     text = data["candidates"][0]["content"]["parts"][0]["text"]
-    
+
     # 清除 markdown 符號
     text = text.strip()
     if text.startswith("```"):
@@ -62,24 +62,21 @@ try:
         if text.startswith("json"):
             text = text[4:]
     text = text.strip()
-    
+
     parsed = json.loads(text)
-    
-    # 確保格式正確
+
     if "stocks" not in parsed:
         raise ValueError("回傳格式錯誤")
-    
+
     print(f"成功取得 {len(parsed['stocks'])} 筆標的")
-    
-    # 寫入 data.json
+
     with open("data.json", "w", encoding="utf-8") as f:
         json.dump(parsed, f, ensure_ascii=False, indent=2)
-    
+
     print("data.json 已更新！")
 
 except Exception as e:
     print(f"發生錯誤: {e}")
-    # 寫入錯誤狀態，避免網頁空白
     error_data = {
         "date": date_short,
         "updated": now.strftime("%H:%M"),
