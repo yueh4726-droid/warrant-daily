@@ -1,9 +1,9 @@
 import requests
 import json
 import os
+import re
 from datetime import datetime, timezone, timedelta
 
-# 台灣時間
 tz = timezone(timedelta(hours=8))
 now = datetime.now(tz)
 date_str = now.strftime("%Y年%m月%d日")
@@ -11,9 +11,36 @@ date_short = now.strftime("%Y-%m-%d")
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
-prompt = f"""你是台股權證分析助理。請搜尋今日（{date_str}）台灣各大財經媒體的權證相關報導，從中找出被提及的權證標的股票。
+# 直接抓取經濟日報權證新聞
+def fetch_news():
+    urls = [
+        "https://money.udn.com/money/story/11074",
+        "https://www.ctee.com.tw/wealth/stock",
+    ]
+    content = ""
+    headers = {"User-Agent": "Mozilla/5.0"}
+    for url in urls:
+        try:
+            r = requests.get(url, headers=headers, timeout=10)
+            r.encoding = "utf-8"
+            text = r.text
+            # 簡單清理 HTML
+            text = re.sub(r'<[^>]+>', ' ', text)
+            text = re.sub(r'\s+', ' ', text)
+            content += text[:3000] + "\n\n"
+        except Exception as e:
+            print(f"抓取 {url} 失敗: {e}")
+    return content
 
-請回傳 JSON 格式，結構如下（只回傳 JSON，不要有其他文字、不要有markdown符號）：
+news_content = fetch_news()
+
+prompt = f"""你是台股權證分析助理。以下是今日（{date_str}）從財經網站抓取的內容，請從中找出權證相關標的股票。
+如果內容不足，請根據你對台股的知識，補充最近常被討論的權證熱門標的。
+
+網站內容：
+{news_content[:4000]}
+
+請回傳 JSON 格式（只回傳 JSON，不要有其他文字、不要有markdown符號）：
 {{
   "date": "{date_short}",
   "updated": "{now.strftime('%H:%M')}",
@@ -33,14 +60,12 @@ prompt = f"""你是台股權證分析助理。請搜尋今日（{date_str}）台
 }}
 
 direction: bull=看多/認購, bear=看空/認售
-source: udn=經濟日報, ctee=工商時報, broker=券商
-至少找5筆，最多15筆，依日期由新到舊排序。"""
+至少5筆，最多15筆。"""
 
 url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={GEMINI_API_KEY}"
 
 payload = {
     "contents": [{"parts": [{"text": prompt}]}],
-    "tools": [{"google_search": {}}],
     "generationConfig": {
         "temperature": 0.3,
         "maxOutputTokens": 2000
@@ -51,13 +76,11 @@ try:
     print(f"正在抓取 {date_str} 的權證資料...")
     response = requests.post(url, json=payload, timeout=60)
     print(f"HTTP狀態碼: {response.status_code}")
-    print(f"回應內容: {response.text[:500]}")
     response.raise_for_status()
 
     data = response.json()
     text = data["candidates"][0]["content"]["parts"][0]["text"]
 
-    # 清除 markdown 符號
     text = text.strip()
     if text.startswith("```"):
         text = text.split("```")[1]
