@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>權證標的日報</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700;900&family=Share+Tech+Mono&display=swap');
+  :root {
+    --bg: #0a0e14; --surface: #111620; --border: #1e2a3a;
+    --accent: #00d4ff; --accent2: #ff6b35;
+    --bull: #00e676; --bear: #ff4444;
+    --text: #e0eaf5; --muted: #5a7a99; --card: #131c28;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Noto Serif TC', serif; min-height:100vh;
+  }
+  body::before {
+    content:''; position:fixed; inset:0;
+    background-image: linear-gradient(rgba(0,212,255,0.03) 1px,transparent 1px), linear-gradient(90deg,rgba(0,212,255,0.03) 1px,transparent 1px);
+    background-size:40px 40px; pointer-events:none; z-index:0;
+  }
+  .container { max-width:900px; margin:0 auto; padding:20px 16px 60px; position:relative; z-index:1; }
+
+  header { border-bottom:1px solid var(--border); padding-bottom:20px; margin-bottom:24px; }
+  .header-top { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+  .title-block h1 { font-size:26px; font-weight:900; letter-spacing:.05em; color:var(--accent); text-shadow:0 0 30px rgba(0,212,255,.3); }
+  .title-block .subtitle { font-family:'Share Tech Mono',monospace; font-size:11px; color:var(--muted); margin-top:4px; letter-spacing:.1em; }
+  .date-badge { font-family:'Share Tech Mono',monospace; font-size:12px; color:var(--accent); background:rgba(0,212,255,.08); border:1px solid rgba(0,212,255,.2); padding:6px 12px; border-radius:4px; white-space:nowrap; flex-shrink:0; }
+
+  .info-bar { display:flex; gap:10px; align-items:center; margin-bottom:20px; flex-wrap:wrap; }
+  .update-badge { font-family:'Share Tech Mono',monospace; font-size:12px; padding:6px 12px; border-radius:4px; border:1px solid var(--border); color:var(--muted); background:var(--surface); }
+  .update-badge.fresh { border-color:rgba(0,230,118,.3); color:var(--bull); background:rgba(0,230,118,.05); }
+  .update-badge.error { border-color:rgba(255,68,68,.3); color:var(--bear); background:rgba(255,68,68,.05); }
+
+  .btn-refresh { padding:8px 16px; background:transparent; color:var(--accent); font-family:'Noto Serif TC',serif; font-size:13px; border:1px solid rgba(0,212,255,.3); border-radius:4px; cursor:pointer; transition:all .2s; }
+  .btn-refresh:hover { background:rgba(0,212,255,.1); }
+
+  .summary-row { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:20px; }
+  .summary-card { background:var(--card); border:1px solid var(--border); border-radius:6px; padding:14px; text-align:center; }
+  .summary-card .num { font-family:'Share Tech Mono',monospace; font-size:28px; font-weight:700; line-height:1; }
+  .summary-card .label { font-size:11px; color:var(--muted); margin-top:4px; }
+  .num.bull { color:var(--bull); } .num.bear { color:var(--bear); } .num.neutral { color:var(--accent); }
+
+  .filter-row { display:flex; gap:6px; margin-bottom:16px; flex-wrap:wrap; }
+  .filter-btn { padding:6px 14px; font-family:'Noto Serif TC',serif; font-size:12px; border-radius:20px; border:1px solid var(--border); background:transparent; color:var(--muted); cursor:pointer; transition:all .2s; }
+  .filter-btn.active, .filter-btn:hover { background:rgba(0,212,255,.1); border-color:var(--accent); color:var(--accent); }
+
+  .stocks-list { display:flex; flex-direction:column; gap:10px; }
+  .stock-card { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:14px 16px; display:grid; grid-template-columns:auto 1fr auto; gap:12px; align-items:start; transition:border-color .2s; animation:slideIn .3s ease forwards; opacity:0; }
+  @keyframes slideIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+  .stock-card:hover { border-color:rgba(0,212,255,.3); }
+  .stock-id { font-family:'Share Tech Mono',monospace; font-size:18px; font-weight:700; color:var(--accent); min-width:50px; }
+  .stock-name { font-size:13px; color:var(--muted); margin-top:2px; font-family:'Share Tech Mono',monospace; }
+  .stock-title { font-size:14px; font-weight:700; color:var(--text); margin-bottom:4px; line-height:1.4; }
+  .stock-reason { font-size:12px; color:var(--muted); line-height:1.6; }
+  .tags { display:flex; gap:4px; flex-wrap:wrap; margin-top:8px; }
+  .tag { font-family:'Share Tech Mono',monospace; font-size:10px; padding:2px 8px; border-radius:3px; }
+  .tag.bull { background:rgba(0,230,118,.1); color:var(--bull); border:1px solid rgba(0,230,118,.2); }
+  .tag.bear { background:rgba(255,68,68,.1); color:var(--bear); border:1px solid rgba(255,68,68,.2); }
+  .tag.source { background:rgba(0,212,255,.08); color:var(--muted); border:1px solid var(--border); }
+  .stock-right { text-align:right; flex-shrink:0; }
+  .direction-badge { font-family:'Share Tech Mono',monospace; font-size:13px; font-weight:700; padding:4px 10px; border-radius:4px; display:inline-block; }
+  .direction-badge.bull { background:rgba(0,230,118,.15); color:var(--bull); }
+  .direction-badge.bear { background:rgba(255,68,68,.15); color:var(--bear); }
+  .time-label { font-family:'Share Tech Mono',monospace; font-size:10px; color:var(--muted); margin-top:4px; }
+
+  .empty-state { text-align:center; padding:60px 20px; color:var(--muted); }
+  .empty-state .icon { font-size:40px; margin-bottom:12px; opacity:.5; }
+  .empty-state p { font-size:14px; line-height:1.8; }
+
+  .countdown-bar { background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:10px 16px; margin-bottom:20px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; }
+  .countdown-label { font-size:12px; color:var(--muted); }
+  .countdown-time { font-family:'Share Tech Mono',monospace; font-size:14px; color:var(--accent); }
+
+  .disclaimer { margin-top:30px; font-size:11px; color:var(--muted); line-height:1.7; padding:12px; border:1px solid var(--border); border-radius:4px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="header-top">
+      <div class="title-block">
+        <h1>⚡ 權證標的日報</h1>
+        <div class="subtitle">WARRANT DAILY · AUTO UPDATE 07:00</div>
+      </div>
+      <div class="date-badge" id="dateBadge">載入中...</div>
+    </div>
+  </header>
+
+  <div class="info-bar">
+    <div class="update-badge" id="updateBadge">⏳ 載入中...</div>
+    <button class="btn-refresh" onclick="loadData()">🔄 重新整理</button>
+  </div>
+
+  <div class="countdown-bar">
+    <span class="countdown-label">⏰ 距離下次自動更新</span>
+    <span class="countdown-time" id="countdown">計算中...</span>
+  </div>
+
+  <div class="summary-row" id="summaryRow">
+    <div class="summary-card"><div class="num bull" id="bullCount">-</div><div class="label">看多標的</div></div>
+    <div class="summary-card"><div class="num bear" id="bearCount">-</div><div class="label">看空標的</div></div>
+    <div class="summary-card"><div class="num neutral" id="totalCount">-</div><div class="label">總計標的</div></div>
+  </div>
+
+  <div class="filter-row">
+    <button class="filter-btn active" onclick="filterStocks('all',this)">全部</button>
+    <button class="filter-btn" onclick="filterStocks('bull',this)">🟢 看多</button>
+    <button class="filter-btn" onclick="filterStocks('bear',this)">🔴 看空</button>
+    <button class="filter-btn" onclick="filterStocks('udn',this)">經濟日報</button>
+    <button class="filter-btn" onclick="filterStocks('ctee',this)">工商時報</button>
+    <button class="filter-btn" onclick="filterStocks('broker',this)">券商推薦</button>
+  </div>
+
+  <div class="stocks-list" id="stocksList">
+    <div class="empty-state"><div class="icon">⏳</div><p>載入中...</p></div>
+  </div>
+
+  <div class="disclaimer">
+    ⚠️ 本工具彙整內容僅供參考，不構成投資建議。權證具有時間價值損耗風險，操作前請充分了解商品特性。投資一定有風險，投資前應詳閱公開說明書。
+  </div>
+</div>
+
+<script>
+let allStocks = [];
+
+// 日期顯示
+const now = new Date();
+const days = ['日','一','二','三','四','五','六'];
+document.getElementById('dateBadge').textContent =
+  `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')} 週${days[now.getDay()]}`;
+
+// 倒數計時到下一個台灣時間 07:00
+function updateCountdown() {
+  const now = new Date();
+  const twNow = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Taipei' }));
+  const next = new Date(twNow);
+  next.setHours(7, 0, 0, 0);
+  if (twNow >= next) next.setDate(next.getDate() + 1);
+  const diff = next - twNow;
+  const h = Math.floor(diff / 3600000);
+  const m = Math.floor((diff % 3600000) / 60000);
+  const s = Math.floor((diff % 60000) / 1000);
+  document.getElementById('countdown').textContent =
+    `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+setInterval(updateCountdown, 1000);
+updateCountdown();
+
+async function loadData() {
+  try {
+    const res = await fetch(`data.json?t=${Date.now()}`);
+    const data = await res.json();
+
+    if (data.error) {
+      document.getElementById('updateBadge').className = 'update-badge error';
+      document.getElementById('updateBadge').textContent = `⚠ 更新失敗：${data.error}`;
+      return;
+    }
+
+    if (!data.date) {
+      document.getElementById('updateBadge').textContent = '尚未有資料，等待第一次自動更新';
+      return;
+    }
+
+    allStocks = data.stocks || [];
+
+    // 判斷資料是否為今日
+    const twDate = new Date().toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei', year:'numeric', month:'2-digit', day:'2-digit' }).replace(/\//g,'-');
+    const isFresh = data.date === twDate;
+    const badge = document.getElementById('updateBadge');
+    badge.className = 'update-badge ' + (isFresh ? 'fresh' : '');
+    badge.textContent = `${isFresh ? '✓ 今日已更新' : '📅 ' + data.date} · 更新時間 ${data.updated}`;
+
+    renderStocks(allStocks);
+    document.getElementById('bullCount').textContent = allStocks.filter(s=>s.direction==='bull').length;
+    document.getElementById('bearCount').textContent = allStocks.filter(s=>s.direction==='bear').length;
+    document.getElementById('totalCount').textContent = allStocks.length;
+
+  } catch(e) {
+    document.getElementById('updateBadge').className = 'update-badge error';
+    document.getElementById('updateBadge').textContent = '⚠ 讀取失敗，請重新整理';
+  }
+}
+
+function renderStocks(stocks) {
+  const list = document.getElementById('stocksList');
+  if (!stocks.length) {
+    list.innerHTML = '<div class="empty-state"><div class="icon">📰</div><p>尚無資料<br>每天早上 07:00 自動更新</p></div>';
+    return;
+  }
+  list.innerHTML = stocks.map((s,i) => `
+    <div class="stock-card" style="animation-delay:${i*0.05}s">
+      <div>
+        <div class="stock-id">${s.id}</div>
+        <div class="stock-name">${s.name}</div>
+      </div>
+      <div>
+        <div class="stock-title">${s.title}</div>
+        <div class="stock-reason">${s.reason}</div>
+        <div class="tags">
+          <span class="tag ${s.direction}">${s.direction==='bull'?'▲ 看多':'▼ 看空'}</span>
+          <span class="tag source">${s.sourceName}</span>
+        </div>
+      </div>
+      <div class="stock-right">
+        <span class="direction-badge ${s.direction}">${s.direction==='bull'?'CALL':'PUT'}</span>
+        <div class="time-label">${s.date||''} ${s.time||''}</div>
+      </div>
+    </div>`).join('');
+}
+
+function filterStocks(type, btn) {
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  const filtered = type==='all' ? allStocks : allStocks.filter(s=>s.direction===type||s.source===type);
+  renderStocks(filtered);
+}
+
+// 自動載入
+loadData();
+// 每5分鐘自動重新整理
+setInterval(loadData, 300000);
+</script>
+</body>
+</html>
