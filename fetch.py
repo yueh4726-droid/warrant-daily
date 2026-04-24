@@ -36,7 +36,7 @@ direction: bull=看多/認購, bear=看空/認售
 source: udn=經濟日報, ctee=工商時報, broker=券商
 至少找5筆，最多15筆，依日期由新到舊排序。"""
 
-url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={GEMINI_API_KEY}"
 
 payload = {
     "contents": [{"parts": [{"text": prompt}]}],
@@ -50,6 +50,8 @@ payload = {
 try:
     print(f"正在抓取 {date_str} 的權證資料...")
     response = requests.post(url, json=payload, timeout=60)
+    print(f"HTTP狀態碼: {response.status_code}")
+    print(f"回應內容: {response.text[:500]}")
     response.raise_for_status()
 
     data = response.json()
